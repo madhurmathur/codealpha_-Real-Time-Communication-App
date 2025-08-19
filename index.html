@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Real-Time Communication</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f7f7f7;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 20px auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.1);
+    }
+    h1 {
+      text-align: center;
+      color: #222;
+    }
+    #auth {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    input {
+      padding: 10px;
+      margin: 5px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      margin: 5px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    #videos {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    video {
+      width: 300px;
+      height: 220px;
+      margin: 10px;
+      border-radius: 10px;
+      background: #000;
+      object-fit: cover;
+    }
+    .controls {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    #whiteboard-container {
+      display: none;
+      text-align: center;
+      margin-top: 20px;
+    }
+    #whiteboard {
+      border: 2px solid #ccc;
+      cursor: crosshair;
+    }
+    .toolbar {
+      margin-bottom: 10px;
+    }
+    input[type="color"],
+    input[type="range"] {
+      margin: 0 10px;
+    }
+    #app {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Welcome to Real-Time Communication</h1>
+
+    <!-- Authentication -->
+    <div id="auth">
+      <h2>Login or Register</h2>
+      <input id="username" type="text" placeholder="Username" />
+      <input id="password" type="password" placeholder="Password" />
+      <button onclick="register()">Register</button>
+      <button onclick="login()">Login</button>
+      <div id="auth-msg" style="color:red;"></div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app">
+      <div id="videos">
+        <video id="localVideo" autoplay muted></video>
+      </div>
+      <div class="controls">
+        <button id="startCall">Start Call</button>
+        <button id="shareScreen">Share Screen</button>
+        <button id="toggleWhiteboard">Whiteboard</button>
+      </div>
+      <div id="whiteboard-container">
+        <div class="toolbar">
+          <label>Color: <input type="color" id="colorPicker" value="#ff0000"></label>
+          <label>Brush Size: <input type="range" id="brushSize" min="2" max="20" value="4"></label>
+          <button id="clearBoard">Clear Board</button>
+          <button id="downloadBoard">Download</button>
+        </div>
+        <canvas id="whiteboard" width="800" height="400"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script>
+    const socket = io('http://localhost:3000');
+    let localStream;
+    let peer;
+    const peers = {};
+    const localVideo = document.getElementById('localVideo');
+    const videosContainer = document.getElementById('videos');
+
+    // Auth Functions
+    function register() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      socket.emit('register', { username, password });
+    }
+
+    function login() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      socket.emit('login', { username, password });
+    }
+
+    socket.on('auth-success', () => {
+      document.getElementById('auth').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      initRTC();
+    });
+
+    socket.on('auth-fail', msg => {
+      document.getElementById('auth-msg').textContent = msg;
+    });
+
+    function initRTC() {
+      // Get camera & mic
+      navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        .then(stream => {
+          localStream = stream;
+          localVideo.srcObject = stream;
+          localVideo.play();
+        })
+        .catch(err => {
+          console.error('Error accessing camera:', err);
+          alert('Please allow camera and microphone access.');
+        });
+
+      // PeerJS
+      peer = new Peer(undefined, {
+        host: '/',
+        port: 3001,
+        path: '/peerjs'
+      });
+
+      peer.on('open', id => {
+        socket.emit('join-room', id);
+      });
+
+      peer.on('call', call => {
+        call.answer(localStream);
+        const video = document.createElement('video');
+        call.on('stream', userVideoStream => {
+          addVideoStream(video, userVideoStream);
+        });
+      });
+
+      socket.on('user-connected', userId => {
+        connectToNewUser(userId, localStream);
+      });
+
+      function connectToNewUser(userId, stream) {
+        const call = peer.call(userId, stream);
+        const video = document.createElement('video');
+        call.on('stream', userVideoStream => {
+          addVideoStream(video, userVideoStream);
+        });
+        call.on('close', () => {
+          video.remove();
+        });
+        peers[userId] = call;
+      }
+
+      function addVideoStream(video, stream) {
+        video.srcObject = stream;
+        video.addEventListener('loadedmetadata', () => {
+          video.play();
+        });
+        videosContainer.append(video);
+      }
+
+      // Screen share
+      document.getElementById('shareScreen').addEventListener('click', async () => {
+        try {
+          const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+          const videoTrack = screenStream.getTracks()[0];
+          for (const peerId in peers) {
+            const sender = peers[peerId].peerConnection.getSenders().find(s => s.track.kind === 'video');
+            sender.replaceTrack(videoTrack);
+          }
+        } catch (err) {
+          console.error('Error sharing screen:', err);
+        }
+      });
+
+      // Whiteboard toggle
+      const whiteboardContainer = document.getElementById('whiteboard-container');
+      document.getElementById('toggleWhiteboard').addEventListener('click', () => {
+        whiteboardContainer.style.display = whiteboardContainer.style.display === 'none' ? 'block' : 'none';
+      });
+
+      // Whiteboard drawing
+      const canvas = document.getElementById('whiteboard');
+      const ctx = canvas.getContext('2d');
+      let drawing = false;
+      let color = document.getElementById('colorPicker').value;
+      let brushSize = document.getElementById('brushSize').value;
+
+      canvas.addEventListener('mousedown', () => drawing = true);
+      canvas.addEventListener('mouseup', () => {
+        drawing = false;
+        ctx.beginPath();
+      });
+      canvas.addEventListener('mouseout', () => drawing = false);
+
+      canvas.addEventListener('mousemove', draw);
+      function draw(e) {
+        if (!drawing) return;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = brushSize;
+        ctx.lineCap = 'round';
+        ctx.lineTo(e.offsetX, e.offsetY);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(e.offsetX, e.offsetY);
+      }
+
+      document.getElementById('colorPicker').addEventListener('change', e => color = e.target.value);
+      document.getElementById('brushSize').addEventListener('input', e => brushSize = e.target.value);
+
+      document.getElementById('clearBoard').addEventListener('click', () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      });
+
+      document.getElementById('downloadBoard').addEventListener('click', () => {
+        const link = document.createElement('a');
+        link.href = canvas.toDataURL('image/png');
+        link.download = 'whiteboard.png';
+        link.click();
+      });
+    }
+  </script>
+</body>
+</html>
