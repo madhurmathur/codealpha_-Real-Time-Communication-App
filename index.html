@@ -1,272 +1,398 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Real-Time Communication</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Real-Time Communication App</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f7f7f7;
-      margin: 0;
-      padding: 0;
+    :root {
+      --primary: #0d6efd;
+      --bg: #f4f4f4;
+      --panel: #ffffff;
     }
-    .container {
-      max-width: 1000px;
-      margin: 20px auto;
-      background: #fff;
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 0 15px rgba(0,0,0,0.1);
-    }
-    h1 {
-      text-align: center;
-      color: #222;
-    }
-    #auth {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-    input {
-      padding: 10px;
-      margin: 5px;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); font-family: Arial, Helvetica, sans-serif; }
+    .container { max-width: 1000px; margin: 24px auto; background: var(--panel); border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,.08); padding: 20px; }
+    h1 { margin: 0 0 10px 0; text-align: center; }
+    h2,h3 { margin: 16px 0 8px; }
     button {
-      background: #007bff;
-      color: white;
-      border: none;
-      padding: 10px 15px;
-      margin: 5px;
-      border-radius: 5px;
-      cursor: pointer;
+      background: var(--primary); color: #fff; border: 0; padding: 10px 14px;
+      border-radius: 8px; cursor: pointer; margin: 6px 6px 6px 0; font-weight: 600;
     }
-    button:hover {
-      background: #0056b3;
+    button:hover { filter: brightness(.92); }
+    input[type="text"], input[type="password"] {
+      width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; margin: 6px 0 10px;
     }
-    #videos {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      margin-bottom: 20px;
-    }
-    video {
-      width: 300px;
-      height: 220px;
-      margin: 10px;
-      border-radius: 10px;
-      background: #000;
-      object-fit: cover;
-    }
-    .controls {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-    #whiteboard-container {
-      display: none;
-      text-align: center;
-      margin-top: 20px;
-    }
-    #whiteboard {
-      border: 2px solid #ccc;
-      cursor: crosshair;
-    }
-    .toolbar {
-      margin-bottom: 10px;
-    }
-    input[type="color"],
-    input[type="range"] {
-      margin: 0 10px;
-    }
-    #app {
-      display: none;
-    }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .muted { color: #666; font-size: 12px; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #eef4ff; color: #2b5cff; font-size: 12px; }
+    .section { border: 1px solid #eee; border-radius: 12px; padding: 14px; margin-top: 12px; }
+
+    #auth-section { text-align: center; }
+    #app-section { display: none; }
+
+    #videos { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+    video { width: 320px; height: 240px; background: #000; border-radius: 10px; }
+
+    #whiteboard-container { display: none; margin-top: 12px; }
+    #whiteboard { border: 1px solid #ddd; border-radius: 8px; background: #fff; touch-action: none; }
+
+    #files-section a.file-link { display: block; margin: 6px 0; color: var(--primary); text-decoration: none; }
+
+    .note { padding: 8px 10px; background: #fff7e6; border: 1px solid #ffe2a8; color: #9a6f00; border-radius: 8px; font-size: 13px; }
+    .error { color: #d00; font-weight: 600; }
+    .ok { color: #0a8; font-weight: 600; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Welcome to Real-Time Communication</h1>
-
-    <!-- Authentication -->
-    <div id="auth">
-      <h2>Login or Register</h2>
-      <input id="username" type="text" placeholder="Username" />
-      <input id="password" type="password" placeholder="Password" />
-      <button onclick="register()">Register</button>
-      <button onclick="login()">Login</button>
-      <div id="auth-msg" style="color:red;"></div>
-    </div>
-
-    <!-- Main App -->
-    <div id="app">
-      <div id="videos">
-        <video id="localVideo" autoplay muted></video>
+  <!-- Auth -->
+  <div id="auth-section" class="container">
+    <h1>Real-Time Communication</h1>
+    <p class="muted">Please <span class="pill">Register</span> or <span class="pill">Login</span> to continue.</p>
+    <div class="grid">
+      <div>
+        <h2>Account</h2>
+        <input id="username" type="text" placeholder="Username"/>
+        <input id="password" type="password" placeholder="Password"/>
+        <div class="row">
+          <button id="registerBtn">Register</button>
+          <button id="loginBtn">Login</button>
+        </div>
+        <p id="authMessage" class="error"></p>
+        <p class="note">Demo storage is in-memory only (server restarts will clear users).</p>
       </div>
-      <div class="controls">
+      <div>
+        <h2>Tips</h2>
+        <ul class="muted">
+          <li>Open this page in two tabs after login to test call.</li>
+          <li>Allow camera/microphone when prompted.</li>
+          <li>Files up to <b>5 MB</b> can be shared (images, pdf, txt, etc.).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- App -->
+  <div id="app-section" class="container">
+    <h1>Welcome 👋</h1>
+
+    <div class="section">
+      <h3>Call</h3>
+      <div id="videos">
+        <video id="localVideo" autoplay muted playsinline></video>
+        <video id="remoteVideo" autoplay playsinline></video>
+      </div>
+      <div class="row">
         <button id="startCall">Start Call</button>
         <button id="shareScreen">Share Screen</button>
-        <button id="toggleWhiteboard">Whiteboard</button>
+        <span class="muted">If screen share stops, click again to re-share.</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>Whiteboard</h3>
+      <div class="row">
+        <button id="toggleWhiteboard">Show / Hide Whiteboard</button>
+        <div class="muted">Choose color & brush size, then draw.</div>
       </div>
       <div id="whiteboard-container">
-        <div class="toolbar">
-          <label>Color: <input type="color" id="colorPicker" value="#ff0000"></label>
-          <label>Brush Size: <input type="range" id="brushSize" min="2" max="20" value="4"></label>
-          <button id="clearBoard">Clear Board</button>
-          <button id="downloadBoard">Download</button>
+        <div class="row" style="margin:10px 0;">
+          <label>Color <input type="color" id="colorPicker" value="#ff0000"></label>
+          <label>Brush <input type="range" id="brushSize" min="1" max="24" value="4"></label>
+          <button id="clearBoard">Clear</button>
+          <button id="downloadBoard">Download PNG</button>
         </div>
-        <canvas id="whiteboard" width="800" height="400"></canvas>
+        <canvas id="whiteboard" width="900" height="500"></canvas>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>File sharing</h3>
+      <div class="row">
+        <input type="file" id="fileInput"/>
+        <button id="sendFile">Send File</button>
+        <span class="muted">Max 5 MB per file.</span>
+      </div>
+      <div id="files-section">
+        <h4>Shared files</h4>
+        <div id="fileList" class="muted">No files yet.</div>
       </div>
     </div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script>
-    const socket = io('http://localhost:3000');
-    let localStream;
-    let peer;
-    const peers = {};
-    const localVideo = document.getElementById('localVideo');
-    const videosContainer = document.getElementById('videos');
+    // ---------- Socket / Auth ----------
+    const socket = io();            // same-origin (http://localhost:3000)
+    const authMsg = document.getElementById('authMessage');
+    const authSection = document.getElementById('auth-section');
+    const appSection  = document.getElementById('app-section');
 
-    // Auth Functions
-    function register() {
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
+    document.getElementById('registerBtn').onclick = () => {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
       socket.emit('register', { username, password });
-    }
-
-    function login() {
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
+    };
+    document.getElementById('loginBtn').onclick = () => {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
       socket.emit('login', { username, password });
-    }
+    };
 
+    socket.on('register-success', (msg) => {
+      authMsg.className = 'ok';
+      authMsg.textContent = msg;
+    });
+    socket.on('register-fail', (msg) => {
+      authMsg.className = 'error';
+      authMsg.textContent = msg;
+    });
+    socket.on('auth-fail', (msg) => {
+      authMsg.className = 'error';
+      authMsg.textContent = msg;
+    });
     socket.on('auth-success', () => {
-      document.getElementById('auth').style.display = 'none';
-      document.getElementById('app').style.display = 'block';
-      initRTC();
+      authMsg.textContent = '';
+      authSection.style.display = 'none';
+      appSection.style.display = 'block';
+      initApp(); // Start media + features after auth
     });
 
-    socket.on('auth-fail', msg => {
-      document.getElementById('auth-msg').textContent = msg;
-    });
+    // ---------- App (after login) ----------
+    function initApp() {
+      // --- Media capture ---
+      let localStream;
+      const localVideo  = document.getElementById('localVideo');
+      const remoteVideo  = document.getElementById('remoteVideo');
 
-    function initRTC() {
-      // Get camera & mic
       navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         .then(stream => {
           localStream = stream;
           localVideo.srcObject = stream;
-          localVideo.play();
         })
         .catch(err => {
-          console.error('Error accessing camera:', err);
-          alert('Please allow camera and microphone access.');
+          console.error('getUserMedia error:', err);
+          alert('Please allow camera & microphone.');
         });
 
-      // PeerJS
-      peer = new Peer(undefined, {
-        host: '/',
-        port: 3001,
-        path: '/peerjs'
-      });
+      // --- WebRTC (simple 1:1 signaling over Socket.IO) ---
+      let pc;
+      const rtcConfig = { iceServers: [{ urls:'stun:stun.l.google.com:19302' }] };
 
-      peer.on('open', id => {
-        socket.emit('join-room', id);
-      });
+      function ensurePC() {
+        if (pc) return pc;
+        pc = new RTCPeerConnection(rtcConfig);
 
-      peer.on('call', call => {
-        call.answer(localStream);
-        const video = document.createElement('video');
-        call.on('stream', userVideoStream => {
-          addVideoStream(video, userVideoStream);
-        });
-      });
+        // send local tracks
+        localStream?.getTracks().forEach(t => pc.addTrack(t, localStream));
 
-      socket.on('user-connected', userId => {
-        connectToNewUser(userId, localStream);
-      });
-
-      function connectToNewUser(userId, stream) {
-        const call = peer.call(userId, stream);
-        const video = document.createElement('video');
-        call.on('stream', userVideoStream => {
-          addVideoStream(video, userVideoStream);
-        });
-        call.on('close', () => {
-          video.remove();
-        });
-        peers[userId] = call;
-      }
-
-      function addVideoStream(video, stream) {
-        video.srcObject = stream;
-        video.addEventListener('loadedmetadata', () => {
-          video.play();
-        });
-        videosContainer.append(video);
-      }
-
-      // Screen share
-      document.getElementById('shareScreen').addEventListener('click', async () => {
-        try {
-          const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-          const videoTrack = screenStream.getTracks()[0];
-          for (const peerId in peers) {
-            const sender = peers[peerId].peerConnection.getSenders().find(s => s.track.kind === 'video');
-            sender.replaceTrack(videoTrack);
+        // receive remote stream
+        pc.ontrack = (e) => {
+          if (e.streams && e.streams[0]) {
+            remoteVideo.srcObject = e.streams[0];
           }
+        };
+
+        // ICE candidates
+        pc.onicecandidate = (e) => {
+          if (e.candidate) socket.emit('candidate', e.candidate);
+        };
+        return pc;
+      }
+
+      document.getElementById('startCall').onclick = async () => {
+        try {
+          const pc = ensurePC();
+          // (re)add tracks in case user clicked before gUM resolved
+          if (localStream) {
+            const haveVideo = pc.getSenders().some(s => s.track && s.track.kind === 'video');
+            if (!haveVideo) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+          }
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          socket.emit('offer', offer);
         } catch (err) {
-          console.error('Error sharing screen:', err);
+          console.error('startCall error:', err);
+        }
+      };
+
+      socket.on('offer', async (offer) => {
+        try {
+          const pc = ensurePC();
+          await pc.setRemoteDescription(new RTCSessionDescription(offer));
+          if (localStream) {
+            const haveVideo = pc.getSenders().some(s => s.track && s.track.kind === 'video');
+            if (!haveVideo) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+          }
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          socket.emit('answer', answer);
+        } catch (err) {
+          console.error('handle offer error:', err);
         }
       });
 
-      // Whiteboard toggle
-      const whiteboardContainer = document.getElementById('whiteboard-container');
-      document.getElementById('toggleWhiteboard').addEventListener('click', () => {
-        whiteboardContainer.style.display = whiteboardContainer.style.display === 'none' ? 'block' : 'none';
+      socket.on('answer', async (answer) => {
+        try {
+          const pc = ensurePC();
+          await pc.setRemoteDescription(new RTCSessionDescription(answer));
+        } catch (err) {
+          console.error('handle answer error:', err);
+        }
       });
 
-      // Whiteboard drawing
+      socket.on('candidate', async (candidate) => {
+        try {
+          const pc = ensurePC();
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (err) {
+          console.error('addIceCandidate error:', err);
+        }
+      });
+
+      // --- Screen share ---
+      document.getElementById('shareScreen').onclick = async () => {
+        try {
+          const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+          const screenTrack = display.getVideoTracks()[0];
+          const pc = ensurePC();
+          const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+          if (sender) {
+            await sender.replaceTrack(screenTrack);
+          }
+          // when user stops sharing, revert to camera if available
+          screenTrack.onended = () => {
+            if (!localStream) return;
+            const camTrack = localStream.getVideoTracks()[0];
+            if (camTrack && sender) sender.replaceTrack(camTrack);
+          };
+        } catch (err) {
+          console.error('shareScreen error:', err);
+          alert('Screen share was cancelled or blocked.');
+        }
+      };
+
+      // --- Whiteboard ---
+      const wbWrap  = document.getElementById('whiteboard-container');
+      const toggleWB = document.getElementById('toggleWhiteboard');
       const canvas = document.getElementById('whiteboard');
       const ctx = canvas.getContext('2d');
       let drawing = false;
-      let color = document.getElementById('colorPicker').value;
-      let brushSize = document.getElementById('brushSize').value;
+      let last = null;
 
-      canvas.addEventListener('mousedown', () => drawing = true);
-      canvas.addEventListener('mouseup', () => {
-        drawing = false;
-        ctx.beginPath();
-      });
-      canvas.addEventListener('mouseout', () => drawing = false);
+      toggleWB.onclick = () => {
+        wbWrap.style.display = (wbWrap.style.display === 'block') ? 'none' : 'block';
+      };
 
-      canvas.addEventListener('mousemove', draw);
-      function draw(e) {
-        if (!drawing) return;
+      const getColor = () => document.getElementById('colorPicker').value;
+      const getSize = () => parseInt(document.getElementById('brushSize').value, 10);
+
+      function line(a, b, color, size) {
         ctx.strokeStyle = color;
-        ctx.lineWidth = brushSize;
+        ctx.lineWidth = size;
         ctx.lineCap = 'round';
-        ctx.lineTo(e.offsetX, e.offsetY);
-        ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(e.offsetX, e.offsetY);
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
       }
 
-      document.getElementById('colorPicker').addEventListener('change', e => color = e.target.value);
-      document.getElementById('brushSize').addEventListener('input', e => brushSize = e.target.value);
+      function posFromEvent(e) {
+        const rect = canvas.getBoundingClientRect();
+        return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      }
 
-      document.getElementById('clearBoard').addEventListener('click', () => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // mouse
+      canvas.addEventListener('mousedown', (e) => { drawing = true; last = posFromEvent(e); });
+      canvas.addEventListener('mouseup',   () => { drawing = false; last = null; });
+      canvas.addEventListener('mouseleave',() => { drawing = false; last = null; });
+      canvas.addEventListener('mousemove', (e) => {
+        if (!drawing) return;
+        const now = posFromEvent(e);
+        line(last, now, getColor(), getSize());
+        last = now;
       });
 
-      document.getElementById('downloadBoard').addEventListener('click', () => {
+      // touch (basic)
+      canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        drawing = true;
+        const t = e.touches[0];
+        last = { x: t.clientX - canvas.getBoundingClientRect().left, y: t.clientY - canvas.getBoundingClientRect().top };
+      }, { passive: false });
+
+      canvas.addEventListener('touchend', (e) => { e.preventDefault(); drawing = false; last = null; }, { passive: false });
+
+      canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (!drawing) return;
+        const t = e.touches[0];
+        const now = { x: t.clientX - canvas.getBoundingClientRect().left, y: t.clientY - canvas.getBoundingClientRect().top };
+        line(last, now, getColor(), getSize());
+        last = now;
+      }, { passive: false });
+
+      document.getElementById('clearBoard').onclick = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      };
+      document.getElementById('downloadBoard').onclick = () => {
         const link = document.createElement('a');
-        link.href = canvas.toDataURL('image/png');
         link.download = 'whiteboard.png';
+        link.href = canvas.toDataURL('image/png');
         link.click();
+      };
+
+      // --- File sharing (Base64, small files) ---
+      const fileInput = document.getElementById('fileInput');
+      const sendFileBtn = document.getElementById('sendFile');
+      const fileList = document.getElementById('fileList');
+
+      function appendFileLink(name, dataUrl) {
+        if (fileList.classList.contains('muted')) {
+          fileList.classList.remove('muted');
+          fileList.textContent = '';
+        }
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = name;
+        a.textContent = `Download ${name}`;
+        a.className = 'file-link';
+        // open in new tab if browser can preview
+        a.target = '_blank';
+        fileList.appendChild(a);
+      }
+
+      sendFileBtn.onclick = () => {
+        const files = fileInput.files;
+        if (!files || !files.length) {
+          alert('Please choose a file first.');
+          return;
+        }
+        const file = files[0];
+        // 5 MB limit for base64 in this demo
+        if (file.size > 5 * 1024 * 1024) {
+          alert('File is too large. Max 5 MB.');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          const payload = { name: file.name, data: reader.result };
+          // show locally immediately
+          appendFileLink(file.name, reader.result);
+          // send to others
+          socket.emit('file-share', payload);
+        };
+        reader.onerror = () => {
+          console.error('FileReader error:', reader.error);
+          alert('Failed to read file.');
+        };
+        reader.readAsDataURL(file);
+      };
+
+      socket.on('file-share', (file) => {
+        // receive from others
+        appendFileLink(file.name, file.data);
       });
     }
   </script>

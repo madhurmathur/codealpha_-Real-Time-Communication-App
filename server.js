@@ -1,118 +1,73 @@
-// server.js
-// Run: npm install express socket.io cors body-parser peer
-// Then: node server.js
-
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
-const bodyParser = require('body-parser');
-const { PeerServer } = require('peer');
 const { Server } = require('socket.io');
 const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  }
+  cors: { origin: '*' }
 });
 
 app.use(cors());
-app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname))); // serve index.html and other assets
+app.use(express.static(path.join(__dirname)));
 
-// In-memory user store (demo). Replace with DB in production.
-const users = []; // { username, password }
+// In-memory user storage (for demo purposes)
+const users = [];
 
-// Simple helper
-function userExists(username) {
-  return users.some(u => u.username === username);
-}
-function verifyUser(username, password) {
-  return users.find(u => u.username === username && u.password === password);
-}
+io.on('connection', (socket) => {
+  console.log('New client connected');
 
-// Socket.IO handling
-io.on('connection', socket => {
-  console.log('Socket connected:', socket.id);
-
-  // Register via socket
+  // ✅ Register User
   socket.on('register', ({ username, password }) => {
     if (!username || !password) {
-      socket.emit('register-fail', 'Username and password required');
-      return;
+      return socket.emit('register-fail', 'All fields are required');
     }
-    if (userExists(username)) {
-      socket.emit('register-fail', 'Username already taken');
-      return;
+    if (users.find(u => u.username === username)) {
+      return socket.emit('register-fail', 'Username already exists');
     }
     users.push({ username, password });
-    console.log('Registered user:', username);
-    socket.emit('register-success', 'Registered successfully — now login');
+    console.log('Registered Users:', users);
+    socket.emit('register-success', 'Registration successful! Please login.');
   });
 
-  // Login via socket
+  // ✅ Login User
   socket.on('login', ({ username, password }) => {
-    if (!username || !password) {
-      socket.emit('auth-fail', 'Username and password required');
-      return;
-    }
-    const user = verifyUser(username, password);
+    const user = users.find(u => u.username === username && u.password === password);
     if (!user) {
-      socket.emit('auth-fail', 'Invalid credentials');
-      return;
+      return socket.emit('auth-fail', 'Invalid username or password');
     }
-    // mark socket as authenticated
     socket.authenticated = true;
-    socket.username = username;
-    console.log(`Socket ${socket.id} authenticated as ${username}`);
+    console.log(`User logged in: ${username}`);
     socket.emit('auth-success');
   });
 
-  // Join room (PeerJS id) — only allowed if authenticated
-  socket.on('join-room', (peerId) => {
-    if (!socket.authenticated) {
-      socket.emit('auth-fail', 'Authentication required to join room');
-      return;
-    }
-    const ROOM = 'room1';
-    socket.join(ROOM);
-    console.log(`${socket.username} (peer ${peerId}) joined ${ROOM}`);
-    // notify others in room about new peer id
-    socket.to(ROOM).emit('user-connected', peerId);
-
-    // whiteboard message relay scoped to room
-    socket.on('draw', (segment) => {
-      // segment: {x0,y0,x1,y1,color,size}
-      socket.to(ROOM).emit('draw', segment);
-    });
-
-    socket.on('clear-board', () => {
-      socket.to(ROOM).emit('clear-board');
-    });
-
-    socket.on('disconnect', () => {
-      console.log(`Socket disconnected: ${socket.id} (${socket.username || 'unknown'})`);
-      socket.to(ROOM).emit('user-disconnected', peerId);
-    });
+  // ✅ WebRTC Signaling (for Video Calls)
+  socket.on('offer', (offer) => {
+    socket.broadcast.emit('offer', offer);
   });
 
-  // Safety: if a socket disconnects without joining, still log
+  socket.on('answer', (answer) => {
+    socket.broadcast.emit('answer', answer);
+  });
+
+  socket.on('candidate', (candidate) => {
+    socket.broadcast.emit('candidate', candidate);
+  });
+
+  // ✅ File Sharing
+  socket.on('file-share', (file) => {
+    console.log(`File shared: ${file.name}`);
+    socket.broadcast.emit('file-share', file);
+  });
+
   socket.on('disconnect', () => {
-    console.log('Socket disconnected:', socket.id);
+    console.log('Client disconnected');
   });
 });
 
-// Start HTTP server on port 3000
-const HTTP_PORT = 3000;
-server.listen(HTTP_PORT, () => {
-  console.log(`HTTP + Socket.IO server running on port ${HTTP_PORT}`);
-  console.log(`Open http://localhost:${HTTP_PORT}/index.html`);
+const PORT = 3000;
+server.listen(PORT, () => {
+  console.log(`✅ Server running at http://localhost:${PORT}`);
 });
-
-// Start PeerJS server on port 3001 (path /peerjs)
-const PEER_PORT = 3001;
-PeerServer({ port: PEER_PORT, path: '/peerjs' });
-console.log(`PeerServer running on port ${PEER_PORT} (path /peerjs)`);
